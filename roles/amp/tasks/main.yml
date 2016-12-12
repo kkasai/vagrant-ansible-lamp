@@ -1,0 +1,86 @@
+---
+- name: Install apache
+  yum: 
+   name: httpd
+
+- name: start httpd
+  systemd:
+    name: httpd
+    enabled: yes
+    state: started
+
+- name: wget remi rpm
+  get_url:
+    url: http://rpms.famillecollet.com/enterprise/remi-release-7.rpm
+    dest: /tmp
+
+- name: rpm remi
+  command: rpm -Uvh remi-release-7.rpm
+  args:
+    chdir: /tmp
+  ignore_errors: yes
+
+- name: Install php5.6
+  yum: 
+    enablerepo: remi,remi-php56,epel
+    name: "{{ item }}"
+  with_items: 
+    - php
+    - php-devel
+    - php-pear
+    - php-mbstring
+    - php-mysql
+
+- name: Install xdebug
+  yum:
+    enablerepo: remi,remi-php56,epel
+    name: php-pecl-xdebug
+
+- name: Setting xdebug
+  blockinfile:
+    dest: /etc/php.ini
+    content: |
+      zend_extension=/usr/lib64/php/modules/xdebug.so
+      xdebug.default_enable=1
+      xdebug.remote_enable=on
+      xdebug.remote_port=9000
+      xdebug.remote_handler=dbgp
+      xdebug.remote_autostart=1
+      xdebug.remote_host=localhost
+
+- name: Install mysql-community
+  yum:
+    name: http://dev.mysql.com/get/mysql-community-release-el7-5.noarch.rpm
+    state: present
+
+- name: Install mysql
+  yum:
+    enablerepo: mysql56-community  
+    name: "{{ item }}"
+  with_items:
+    - mysql-server
+    - MySQL-python
+
+- name: Start mysql
+  systemd:
+    name: mysqld
+    enabled: yes
+    state: started
+
+- name: Setting MySQL user
+  mysql_user:
+    name: "{{ mysql.user}}"
+    password: "{{ mysql.password }}"
+
+- name: Install phpMyAdmin
+  yum:
+    enablerepo: remi,remi-php56,epel
+    name: phpMyAdmin
+
+- name: Setting phpMyAdmin (Apache2.4)
+  replace:
+    dest: /etc/httpd/conf.d/phpMyAdmin.conf
+    regexp: "Require local"
+    replace: "Require all granted"
+  notify:
+    - Restart httpd
